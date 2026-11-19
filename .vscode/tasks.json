@@ -38,38 +38,7 @@
     {
       "label": "Git — Commit and Push",
       "type": "shell",
-      "command": "git",
-      "args": [
-        "add", "-A"
-      ],
-      "dependsOrder": "sequence",
-      "dependsOn": ["Git — Stage All"],
-      "group": "none",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": false
-      },
-      "problemMatcher": [],
-      "detail": "Stage all, commit with message, and push to origin/main"
-    },
-    {
-      "label": "Git — Stage All",
-      "type": "shell",
-      "command": "git",
-      "args": ["add", "-A"],
-      "presentation": { "reveal": "silent", "panel": "shared" },
-      "problemMatcher": []
-    },
-    {
-      "label": "Git — Commit and Push",
-      "type": "shell",
-      "command": "git",
-      "args": [
-        "add", "-A",
-        "&&", "git", "commit", "-m", "${input:commitMsg}",
-        "&&", "git", "push", "origin", "main"
-      ],
+      "command": "git add -A && git commit -m \"${input:commitMsg}\" && git push origin main",
       "options": {
         "shell": {
           "executable": "cmd.exe",
@@ -80,7 +49,7 @@
       "presentation": {
         "echo": true,
         "reveal": "always",
-        "focus": false,
+        "focus": true,
         "panel": "shared",
         "clear": false
       },

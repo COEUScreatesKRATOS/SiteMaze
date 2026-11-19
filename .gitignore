@@ -56,3 +56,6 @@ init_repo.ps1
 *.pem
 *.key
 secrets.json
+
+# Kiro agent internals — never publish to public repo
+.kiro/

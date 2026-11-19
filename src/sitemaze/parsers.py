@@ -15,13 +15,17 @@ def segment_to_title(segment: str) -> str:
     """Convert a URL segment to a CamelCase display title.
 
     Examples:
-        "fake-page"     → "FakePage"
-        "some_page_name"→ "SomePageName"
-        "test"          → "Test"
-        ""              → "(root)"
+        "fake-page"       → "FakePage"
+        "some_page_name"  → "SomePageName"
+        "test"            → "Test"
+        "Index.htm"       → "Index"
+        "some-page.html"  → "SomePage"
+        ""                → "(root)"
     """
     if not segment:
         return "(root)"
+    # Strip common file extensions before titling
+    segment = re.sub(r"\.(html?|aspx?|php|jsp|cfm|xml|json)$", "", segment, flags=re.IGNORECASE)
     # Split on hyphens, underscores, dots, spaces
     words = re.split(r"[-_.\s]+", segment)
     return "".join(w.capitalize() for w in words if w)

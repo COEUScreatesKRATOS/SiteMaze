@@ -29,6 +29,12 @@ cache/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# Windows OneDrive sync artifacts
+*.tmp
+~$*
 
 # Test / coverage
 .pytest_cache/
@@ -38,3 +44,15 @@ htmlcov/
 # Distribution
 *.whl
 *.tar.gz
+
+# Setup / scratch scripts (not part of project)
+setup_env.ps1
+init_repo.ps1
+*.ps1
+
+# Secrets / local config
+.env
+.env.*
+*.pem
+*.key
+secrets.json

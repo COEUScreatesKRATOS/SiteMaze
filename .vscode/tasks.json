@@ -1,0 +1,47 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start SiteMaze",
+      "type": "shell",
+      "command": "python",
+      "args": ["-m", "sitemaze"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": false,
+        "clear": true
+      },
+      "problemMatcher": [],
+      "detail": "Launch SiteMaze at http://localhost:5000"
+    },
+    {
+      "label": "Start SiteMaze (custom port)",
+      "type": "shell",
+      "command": "python",
+      "args": ["-m", "sitemaze", "--port", "${input:smPort}"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "clear": true
+      },
+      "problemMatcher": [],
+      "detail": "Launch SiteMaze on a custom port"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "smPort",
+      "type": "promptString",
+      "description": "Port to run SiteMaze on",
+      "default": "5000"
+    }
+  ]
+}

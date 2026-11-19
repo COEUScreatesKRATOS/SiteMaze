@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SiteMaze</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    /* ── Tokens ── */
+    :root {
+      --bg:        #0d0d0d;
+      --bg2:       #141414;
+      --bg3:       #1a1a1a;
+      --border:    #2a2a2a;
+      --text:      #e8e8e8;
+      --muted:     #888;
+      --accent:    #00b4ff;
+      --accent-glow: rgba(0,180,255,.35);
+      --red:       #ff4444;
+      --font:      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono:      'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+      --radius:    10px;
+      --transition: 200ms ease;
+    }
+    [data-theme="light"] {
+      --bg:        #f8f9fa;
+      --bg2:       #ffffff;
+      --bg3:       #f0f1f3;
+      --border:    #dde0e5;
+      --text:      #1a1a2e;
+      --muted:     #6b7280;
+      --accent:    #3d3bf3;
+      --accent-glow: rgba(61,59,243,.25);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.6;
+      transition: background var(--transition), color var(--transition);
+    }
+
+    /* ── Layout ── */
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+    .card-wrap {
+      width: 100%;
+      max-width: 560px;
+    }
+
+    /* ── Theme toggle ── */
+    .theme-btn {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 18px;
+      color: var(--text);
+      transition: border-color var(--transition);
+      z-index: 100;
+    }
+    .theme-btn:hover { border-color: var(--accent); }
+
+    /* ── Logo ── */
+    .logo {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .logo-text {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-shadow: 0 0 32px var(--accent-glow);
+    }
+    .logo-text span { color: var(--text); }
+    .tagline {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ── Input card ── */
+    .input-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 12px;
+      transition: border-color var(--transition);
+    }
+    .input-card:focus-within { border-color: var(--accent); }
+    .url-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .url-icon { font-size: 18px; flex-shrink: 0; }
+    .url-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 15px;
+      font-family: var(--mono);
+      caret-color: var(--accent);
+    }
+    .url-input::placeholder { color: var(--muted); }
+    .clear-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color var(--transition);
+      display: none;
+    }
+    .clear-btn:hover { color: var(--text); }
+    .clear-btn.visible { display: block; }
+
+    /* ── Divider ── */
+    .divider {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 2px;
+      margin: 10px 0;
+      position: relative;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 42%;
+      height: 1px;
+      background: var(--border);
+    }
+    .divider::before { left: 0; }
+    .divider::after { right: 0; }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      background: var(--bg2);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color var(--transition), background var(--transition);
+      margin-bottom: 12px;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 5%, var(--bg2));
+    }
+    .drop-icon { font-size: 28px; margin-bottom: 8px; }
+    .drop-label { color: var(--muted); font-size: 14px; }
+    .drop-label strong { color: var(--text); }
+    .drop-browse {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    #file-input { display: none; }
+    .drop-filename {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--accent);
+      font-family: var(--mono);
+      display: none;
+    }
+
+    /* ── Explore button ── */
+    .explore-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      color: #000;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: opacity var(--transition), box-shadow var(--transition);
+      margin-bottom: 16px;
+    }
+    .explore-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .explore-btn:not(:disabled):hover {
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    /* ── Advanced options accordion ── */
+    .adv-toggle {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+      transition: color var(--transition);
+    }
+    .adv-toggle:hover { color: var(--text); }
+    .adv-arrow { transition: transform 200ms; display: inline-block; }
+    .adv-toggle.open .adv-arrow { transform: rotate(90deg); }
+
+    .adv-panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      display: none;
+      gap: 12px;
+      flex-direction: column;
+    }
+    .adv-panel.open { display: flex; }
+
+    .field-group { display: flex; flex-direction: column; gap: 4px; }
+    .field-label { font-size: 12px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+    .field-input {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--mono);
+      outline: none;
+      transition: border-color var(--transition);
+      width: 100%;
+    }
+    .field-input:focus { border-color: var(--accent); }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+    /* ── Recent sites ── */
+    .recent {
+      margin-top: 24px;
+    }
+    .recent-label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .recent-list { display: flex; flex-direction: column; gap: 6px; }
+    .recent-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: border-color var(--transition);
+    }
+    .recent-item:hover { border-color: var(--accent); }
+    .recent-domain { font-family: var(--mono); font-size: 13px; color: var(--accent); flex: 1; }
+    .recent-meta { font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<button class="theme-btn" id="theme-btn" title="Toggle theme">🌙</button>
+
+<div class="page">
+  <div class="card-wrap">
+
+    <!-- Logo -->
+    <div class="logo">
+      <div class="logo-text">◈ <span>Site</span>Maze</div>
+      <div class="tagline">Crawl any website as a living 3D knowledge graph</div>
+    </div>
+
+    <!-- URL input -->
+    <div class="input-card">
+      <div class="url-row">
+        <span class="url-icon">🔗</span>
+        <input
+          class="url-input"
+          id="url-input"
+          type="text"
+          placeholder="https://example.com"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <button class="clear-btn" id="clear-btn" title="Clear">✕</button>
+      </div>
+    </div>
+
+    <div class="divider">or</div>
+
+    <!-- Drop zone -->
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-icon">⬆</div>
+      <div class="drop-label">
+        Drag &amp; drop a <strong>.json</strong> or <strong>.html</strong> export here<br>
+        or <span class="drop-browse" id="drop-browse">browse files</span>
+      </div>
+      <div class="drop-filename" id="drop-filename"></div>
+      <input type="file" id="file-input" accept=".json,.html">
+    </div>
+
+    <!-- Explore button -->
+    <button class="explore-btn" id="explore-btn" disabled>▶  Explore Site</button>
+
+    <!-- Advanced options -->
+    <button class="adv-toggle" id="adv-toggle">
+      <span class="adv-arrow">▸</span> Advanced Options
+    </button>
+    <div class="adv-panel" id="adv-panel">
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label">Max Depth</label>
+          <input class="field-input" id="adv-depth" type="number" value="5" min="1" max="20">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Max Pages</label>
+          <input class="field-input" id="adv-pages" type="number" value="500" min="1" max="5000">
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Bearer Token</label>
+        <input class="field-input" id="adv-bearer" type="password" placeholder="eyJ...">
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label">Basic Auth User</label>
+          <input class="field-input" id="adv-user" type="text" placeholder="username">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Basic Auth Password</label>
+          <input class="field-input" id="adv-pass" type="password" placeholder="••••••">
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Extra Headers (JSON)</label>
+        <input class="field-input" id="adv-headers" type="text" placeholder='{"X-Api-Key": "abc"}'>
+      </div>
+    </div>
+
+    <!-- Recent -->
+    <div class="recent" id="recent-section" style="display:none;">
+      <div class="recent-label">Recent</div>
+      <div class="recent-list" id="recent-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ── Theme ──────────────────────────────────────────────────────────────
+  const html = document.documentElement;
+  const themeBtn = document.getElementById('theme-btn');
+  const saved = localStorage.getItem('sm-theme') || 'dark';
+  html.setAttribute('data-theme', saved);
+  themeBtn.textContent = saved === 'dark' ? '☀️' : '🌙';
+
+  themeBtn.addEventListener('click', () => {
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    themeBtn.textContent = next === 'dark' ? '☀️' : '🌙';
+    localStorage.setItem('sm-theme', next);
+  });
+
+  // ── URL input ──────────────────────────────────────────────────────────
+  const urlInput   = document.getElementById('url-input');
+  const clearBtn   = document.getElementById('clear-btn');
+  const exploreBtn = document.getElementById('explore-btn');
+
+  let droppedFile = null;
+
+  function updateExploreBtn() {
+    const hasUrl  = urlInput.value.trim().length > 0;
+    const hasFile = droppedFile !== null;
+    exploreBtn.disabled = !(hasUrl || hasFile);
+    clearBtn.classList.toggle('visible', urlInput.value.length > 0);
+  }
+
+  urlInput.addEventListener('input', updateExploreBtn);
+  clearBtn.addEventListener('click', () => { urlInput.value = ''; updateExploreBtn(); urlInput.focus(); });
+
+  // ── Drop zone ──────────────────────────────────────────────────────────
+  const dropZone    = document.getElementById('drop-zone');
+  const dropBrowse  = document.getElementById('drop-browse');
+  const fileInput   = document.getElementById('file-input');
+  const dropFilename = document.getElementById('drop-filename');
+
+  dropBrowse.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('click', (e) => { if (e.target !== dropBrowse) fileInput.click(); });
+
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    droppedFile = file;
+    dropFilename.textContent = '📄 ' + file.name;
+    dropFilename.style.display = 'block';
+    urlInput.value = '';
+    updateExploreBtn();
+  }
+
+  // ── Advanced options ───────────────────────────────────────────────────
+  const advToggle = document.getElementById('adv-toggle');
+  const advPanel  = document.getElementById('adv-panel');
+
+  advToggle.addEventListener('click', () => {
+    const open = advPanel.classList.toggle('open');
+    advToggle.classList.toggle('open', open);
+  });
+
+  // ── Explore / Import ───────────────────────────────────────────────────
+  exploreBtn.addEventListener('click', async () => {
+    if (droppedFile) {
+      await importFile(droppedFile);
+    } else {
+      startCrawl(urlInput.value.trim());
+    }
+  });
+
+  async function importFile(file) {
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const res  = await fetch('/api/import', { method: 'POST', body: form });
+      const data = await res.json();
+      if (data.error) { alert('Import error: ' + data.error); return; }
+      sessionStorage.setItem('sm-graph', JSON.stringify(data.graph));
+      window.location.href = '/graph';
+    } catch (e) {
+      alert('Import failed: ' + e.message);
+    }
+  }
+
+  function startCrawl(url) {
+    const auth = {
+      bearer_token:  document.getElementById('adv-bearer').value.trim() || null,
+      basic_user:    document.getElementById('adv-user').value.trim()   || null,
+      basic_pass:    document.getElementById('adv-pass').value.trim()   || null,
+    };
+    const headersRaw = document.getElementById('adv-headers').value.trim();
+    if (headersRaw) {
+      try { auth.extra_headers = JSON.parse(headersRaw); } catch {}
+    }
+
+    const params = {
+      url,
+      auth,
+      max_depth: parseInt(document.getElementById('adv-depth').value) || 5,
+      max_pages: parseInt(document.getElementById('adv-pages').value) || 500,
+    };
+
+    sessionStorage.setItem('sm-crawl-params', JSON.stringify(params));
+    window.location.href = '/graph?mode=crawl&url=' + encodeURIComponent(url);
+  }
+
+  // ── Recent sites ───────────────────────────────────────────────────────
+  async function loadRecent() {
+    try {
+      const res  = await fetch('/api/cached');
+      const list = await res.json();
+      if (!list.length) return;
+
+      document.getElementById('recent-section').style.display = 'block';
+      const container = document.getElementById('recent-list');
+      container.innerHTML = '';
+
+      list.slice(0, 5).forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'recent-item';
+        el.innerHTML = `
+          <span class="recent-domain">${item.domain}</span>
+          <span class="recent-meta">${item.nodes} nodes · ${item.edges} edges</span>
+        `;
+        el.addEventListener('click', () => {
+          urlInput.value = item.url || item.domain;
+          updateExploreBtn();
+          startCrawl(item.url || item.domain);
+        });
+        container.appendChild(el);
+      });
+    } catch {}
+  }
+
+  loadRecent();
+  updateExploreBtn();
+</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sitemaze"
+version = "0.1.0"
+description = "Crawl any website and visualize its page hierarchy as an interactive 3D knowledge graph."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+authors = [{ name = "SiteMaze Contributors" }]
+keywords = [
+  "web-crawler", "sitemap", "visualization", "3d-force-graph",
+  "flask", "cli", "developer-tools", "site-architecture"
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: GNU Affero General Public License v3",
+  "Operating System :: OS Independent",
+  "Topic :: Internet :: WWW/HTTP",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "flask>=3.0",
+  "requests>=2.31",
+  "beautifulsoup4>=4.12",
+  "lxml>=5.0",
+]
+
+[project.scripts]
+sitemaze = "sitemaze.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/chris-harding-brown/SiteMaze"
+"Bug Tracker" = "https://github.com/chris-harding-brown/SiteMaze/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+sitemaze = ["frontend/*.html"]

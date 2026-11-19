@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SiteMaze — Graph</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/3d-force-graph@1"></script>
+  <style>
+    :root {
+      --bg:      #0d0d0d;
+      --bg2:     #141414;
+      --bg3:     #1a1a1a;
+      --border:  #2a2a2a;
+      --text:    #e8e8e8;
+      --muted:   #888;
+      --accent:  #00b4ff;
+      --accent-glow: rgba(0,180,255,.35);
+      --panel-w: 260px;
+      --toolbar-w: 220px;
+      --font:    -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono:    'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    }
+    [data-theme="light"] {
+      --bg:      #f0f1f3;
+      --bg2:     #ffffff;
+      --bg3:     #e8eaed;
+      --border:  #d0d4da;
+      --text:    #1a1a2e;
+      --muted:   #6b7280;
+      --accent:  #3d3bf3;
+      --accent-glow: rgba(61,59,243,.25);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font); }
+
+    /* ── Top bar ───────────────────────────────────────────────── */
+    #topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 48px;
+      background: var(--bg2); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px; padding: 0 14px;
+      z-index: 200; user-select: none;
+    }
+    .tb-btn {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 4px 10px; font-size: 13px; cursor: pointer;
+      white-space: nowrap; transition: border-color 150ms;
+    }
+    .tb-btn:hover { border-color: var(--accent); }
+    .tb-title {
+      font-weight: 700; letter-spacing: 3px; color: var(--accent); font-size: 14px;
+      text-transform: uppercase;
+    }
+    .tb-domain { font-family: var(--mono); font-size: 13px; color: var(--muted); flex: 1; }
+    .search-wrap {
+      position: relative; display: flex; align-items: center;
+    }
+    #search-input {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 5px 32px 5px 10px; font-size: 13px; outline: none;
+      width: 180px; font-family: var(--mono); transition: border-color 150ms, width 200ms;
+    }
+    #search-input:focus { border-color: var(--accent); width: 240px; }
+    .search-clear {
+      position: absolute; right: 8px; color: var(--muted); cursor: pointer; font-size: 13px;
+      display: none;
+    }
+    .search-clear.visible { display: block; }
+
+    /* ── Graph canvas ──────────────────────────────────────────── */
+    #graph-wrap {
+      position: fixed; top: 48px; bottom: 0; left: 0; right: 0;
+      transition: left 300ms ease, right 300ms ease;
+    }
+    #graph-wrap.panel-open { left: var(--panel-w); }
+    #graph-wrap.toolbar-open { right: var(--toolbar-w); }
+
+    /* ── Loading overlay ───────────────────────────────────────── */
+    #loading {
+      position: fixed; top: 48px; left: 0; right: 0; bottom: 0;
+      background: var(--bg); z-index: 150; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 20px;
+    }
+    #loading.hidden { display: none; }
+    .loading-title { font-size: 20px; font-weight: 700; color: var(--accent); }
+    .log-box {
+      width: 540px; max-width: 90vw;
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px 20px; font-family: var(--mono); font-size: 13px;
+      color: var(--text); height: 220px; overflow-y: auto;
+    }
+    .log-line { padding: 2px 0; color: var(--muted); }
+    .log-line.ok { color: #39ff14; }
+    .log-line.err { color: #ff4444; }
+    .progress-bar-wrap {
+      width: 540px; max-width: 90vw; height: 6px;
+      background: var(--border); border-radius: 3px; overflow: hidden;
+    }
+    .progress-bar { height: 100%; background: var(--accent); width: 0%; transition: width 300ms; }
+    .cancel-btn {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--muted); padding: 8px 24px; cursor: pointer; font-size: 14px;
+      transition: border-color 150ms;
+    }
+    .cancel-btn:hover { border-color: #ff4444; color: #ff4444; }
+
+    /* ── Left inspector panel ──────────────────────────────────── */
+    #inspector {
+      position: fixed; top: 48px; left: 0; bottom: 0; width: var(--panel-w);
+      background: var(--bg2); border-right: 1px solid var(--border);
+      transform: translateX(-100%); transition: transform 300ms ease;
+      z-index: 100; overflow-y: auto; padding: 16px;
+    }
+    #inspector.open { transform: translateX(0); }
+
+    .insp-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .insp-url { font-family: var(--mono); font-size: 12px; color: var(--accent); word-break: break-all; margin-bottom: 12px; }
+    .insp-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .insp-row:last-of-type { border-bottom: none; }
+    .insp-key { color: var(--muted); }
+    .insp-val { color: var(--text); font-family: var(--mono); font-size: 12px; }
+    .insp-actions { margin-top: 14px; display: flex; flex-direction: column; gap: 7px; }
+    .insp-btn {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 7px 12px; cursor: pointer; font-size: 13px;
+      text-align: left; transition: border-color 150ms;
+    }
+    .insp-btn:hover { border-color: var(--accent); }
+    .insp-label {
+      font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--muted); margin-top: 14px; margin-bottom: 6px;
+    }
+    .insp-close {
+      position: absolute; top: 10px; right: 10px; background: none; border: none;
+      color: var(--muted); cursor: pointer; font-size: 18px;
+    }
+    .insp-close:hover { color: var(--text); }
+
+    /* ── Right toolbar ─────────────────────────────────────────── */
+    #toolbar {
+      position: fixed; top: 48px; right: 0; bottom: 0; width: var(--toolbar-w);
+      background: var(--bg2); border-left: 1px solid var(--border);
+      transform: translateX(100%); transition: transform 300ms ease;
+      z-index: 100; padding: 16px; overflow-y: auto;
+    }
+    #toolbar.open { transform: translateX(0); }
+
+    /* Hover trigger zone */
+    #toolbar-trigger {
+      position: fixed; top: 48px; right: 0; bottom: 0; width: 24px; z-index: 99;
+    }
+
+    .tb-toggle-btn {
+      position: fixed; top: 60px; right: 0; z-index: 101;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-right: none; border-radius: 6px 0 0 6px;
+      color: var(--muted); padding: 6px 8px; cursor: pointer; font-size: 14px;
+      transition: border-color 150ms, transform 300ms ease;
+    }
+    #toolbar.open ~ #tb-toggle-btn,
+    .tb-toggle-btn.shifted { right: var(--toolbar-w); }
+
+    .tb-section-title {
+      font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 10px; margin-top: 14px;
+    }
+    .tb-section-title:first-child { margin-top: 0; }
+    .stat-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+    .stat-key { color: var(--muted); }
+    .stat-val { font-family: var(--mono); color: var(--text); }
+    .tb-divider { height: 1px; background: var(--border); margin: 10px 0; }
+    .toggle-group { display: flex; gap: 6px; margin-bottom: 6px; }
+    .toggle-opt {
+      flex: 1; padding: 6px 0; text-align: center; font-size: 12px; cursor: pointer;
+      border-radius: 6px; border: 1px solid var(--border); color: var(--muted);
+      transition: all 150ms;
+    }
+    .toggle-opt.active {
+      background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700;
+    }
+    .lock-btn {
+      width: 100%; margin-top: 14px; padding: 7px; background: var(--bg3);
+      border: 1px solid var(--border); border-radius: 6px; color: var(--muted);
+      cursor: pointer; font-size: 13px; transition: border-color 150ms;
+    }
+    .lock-btn:hover { border-color: var(--accent); color: var(--text); }
+    .match-count { font-size: 13px; color: var(--accent); font-family: var(--mono); }
+
+    /* ── Depth colours ─────────────────────────────────────────── */
+    /* Defined in JS */
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <button class="tb-btn" onclick="window.location.href='/'">🏠</button>
+  <button class="tb-btn" id="back-btn">↩ Graph</button>
+  <span class="tb-title">◈ SiteMaze</span>
+  <span class="tb-domain" id="tb-domain"></span>
+  <div class="search-wrap">
+    <input id="search-input" type="text" placeholder="🔍 Search nodes...">
+    <span class="search-clear" id="search-clear">✕</span>
+  </div>
+  <button class="tb-btn" id="theme-btn">☀️</button>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="loading-title" id="loading-title">◈ Mapping…</div>
+  <div class="log-box" id="log-box"></div>
+  <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+  <button class="cancel-btn" id="cancel-btn">✕  Cancel</button>
+</div>
+
+<!-- Graph canvas -->
+<div id="graph-wrap">
+  <div id="3d-graph"></div>
+</div>
+
+<!-- Left inspector -->
+<div id="inspector">
+  <button class="insp-close" id="insp-close">✕</button>
+  <div class="insp-label">Node Inspector</div>
+  <div class="insp-title" id="insp-title"></div>
+  <div class="insp-url"  id="insp-url"></div>
+  <div class="insp-row"><span class="insp-key">Depth</span><span class="insp-val" id="insp-depth"></span></div>
+  <div class="insp-row"><span class="insp-key">Children</span><span class="insp-val" id="insp-children"></span></div>
+  <div class="insp-row"><span class="insp-key">Parent</span><span class="insp-val" id="insp-parent"></span></div>
+  <div class="insp-actions">
+    <button class="insp-btn" id="insp-open">↗ Open URL</button>
+    <button class="insp-btn" id="insp-expand">⊕ Expand All Children</button>
+    <button class="insp-btn" id="insp-collapse">⊖ Collapse All Children</button>
+    <button class="insp-btn" id="insp-copy">📋 Copy URL</button>
+    <button class="insp-btn" id="insp-export">📤 Export Graph</button>
+  </div>
+</div>
+
+<!-- Right toolbar trigger + panel -->
+<div id="toolbar-trigger"></div>
+<div id="toolbar">
+  <div class="tb-section-title">Graph Stats</div>
+  <div class="stat-row"><span class="stat-key">Nodes</span><span class="stat-val" id="stat-nodes">—</span></div>
+  <div class="stat-row"><span class="stat-key">Edges</span><span class="stat-val" id="stat-edges">—</span></div>
+  <div class="stat-row"><span class="stat-key">Depth</span><span class="stat-val" id="stat-depth">—</span></div>
+  <div class="tb-divider"></div>
+  <div class="tb-section-title">Search Matches</div>
+  <div class="match-count" id="match-count">—</div>
+  <div class="tb-divider"></div>
+  <div class="tb-section-title">Color Mode</div>
+  <div class="toggle-group">
+    <div class="toggle-opt active" id="color-depth" onclick="setColorMode('depth')">Depth</div>
+    <div class="toggle-opt"        id="color-path"  onclick="setColorMode('path')">Path</div>
+  </div>
+  <div class="tb-section-title">Node Size</div>
+  <div class="toggle-group">
+    <div class="toggle-opt active" id="size-direct" onclick="setSizeMode('direct')">Direct</div>
+    <div class="toggle-opt"        id="size-total"  onclick="setSizeMode('total')">Total</div>
+  </div>
+  <button class="lock-btn" id="lock-btn">🔒 Lock Open</button>
+</div>
+<button class="tb-btn tb-toggle-btn" id="tb-toggle-btn" title="Toggle toolbar">⟨</button>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════════════════════════
+let allNodes = [];   // full graph node list
+let allEdges = [];   // full graph edge list
+let visibleIds = new Set();
+let pinnedIds  = new Set();
+let selectedNode = null;
+let colorMode = 'depth';
+let sizeMode  = 'direct';
+let searchQuery = '';
+let gfx = null;         // 3d-force-graph instance
+let cancelFetch = false;
+
+const DEPTH_COLORS = ['#00b4ff','#7c3aed','#ec4899','#f97316','#22c55e','#eab308','#06b6d4','#a855f7'];
+const PATH_COLORS  = ['#00b4ff','#7c3aed','#ec4899','#f97316','#22c55e','#eab308','#06b6d4','#a855f7','#f43f5e','#84cc16'];
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Theme
+// ═══════════════════════════════════════════════════════════════════════════
+const html = document.documentElement;
+const themeBtn = document.getElementById('theme-btn');
+const saved = localStorage.getItem('sm-theme') || 'dark';
+html.setAttribute('data-theme', saved);
+themeBtn.textContent = saved === 'dark' ? '☀️' : '🌙';
+
+themeBtn.addEventListener('click', () => {
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  themeBtn.textContent = next === 'dark' ? '☀️' : '🌙';
+  localStorage.setItem('sm-theme', next);
+  if (gfx) gfx.backgroundColor(next === 'dark' ? '#0d0d0d' : '#f0f1f3');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Toolbar panel (hover / lock)
+// ═══════════════════════════════════════════════════════════════════════════
+const toolbar       = document.getElementById('toolbar');
+const toolbarTrig   = document.getElementById('toolbar-trigger');
+const tbToggleBtn   = document.getElementById('tb-toggle-btn');
+const lockBtn       = document.getElementById('lock-btn');
+const graphWrap     = document.getElementById('graph-wrap');
+let toolbarLocked   = false;
+let toolbarHoverTimer = null;
+
+function openToolbar() {
+  toolbar.classList.add('open');
+  tbToggleBtn.classList.add('shifted');
+  tbToggleBtn.textContent = '⟩';
+  graphWrap.classList.add('toolbar-open');
+  if (gfx) setTimeout(() => gfx.width(graphWrap.clientWidth), 310);
+}
+function closeToolbar() {
+  if (toolbarLocked) return;
+  toolbar.classList.remove('open');
+  tbToggleBtn.classList.remove('shifted');
+  tbToggleBtn.textContent = '⟨';
+  graphWrap.classList.remove('toolbar-open');
+  if (gfx) setTimeout(() => gfx.width(graphWrap.clientWidth), 310);
+}
+
+toolbarTrig.addEventListener('mouseenter', () => {
+  openToolbar();
+  clearTimeout(toolbarHoverTimer);
+});
+toolbar.addEventListener('mouseenter', () => clearTimeout(toolbarHoverTimer));
+toolbar.addEventListener('mouseleave', () => {
+  if (!toolbarLocked) toolbarHoverTimer = setTimeout(closeToolbar, 3000);
+});
+toolbarTrig.addEventListener('mouseleave', () => {
+  if (!toolbarLocked) toolbarHoverTimer = setTimeout(closeToolbar, 3000);
+});
+
+tbToggleBtn.addEventListener('click', () => {
+  if (toolbar.classList.contains('open')) closeToolbar();
+  else openToolbar();
+});
+
+lockBtn.addEventListener('click', () => {
+  toolbarLocked = !toolbarLocked;
+  lockBtn.textContent = toolbarLocked ? '🔓 Unlock' : '🔒 Lock Open';
+  if (toolbarLocked) openToolbar();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Inspector panel
+// ═══════════════════════════════════════════════════════════════════════════
+const inspector = document.getElementById('inspector');
+
+function openInspector(node) {
+  selectedNode = node;
+  document.getElementById('insp-title').textContent    = node.title || node.id;
+  document.getElementById('insp-url').textContent      = node.url   || node.id;
+  document.getElementById('insp-depth').textContent    = node.depth ?? '—';
+  document.getElementById('insp-children').textContent = childCount(node.id);
+  document.getElementById('insp-parent').textContent   = node.parent || '—';
+  inspector.classList.add('open');
+  graphWrap.classList.add('panel-open');
+  if (gfx) setTimeout(() => gfx.width(graphWrap.clientWidth), 310);
+}
+
+function closeInspector() {
+  selectedNode = null;
+  inspector.classList.remove('open');
+  graphWrap.classList.remove('panel-open');
+  if (gfx) setTimeout(() => gfx.width(graphWrap.clientWidth), 310);
+  refreshGraph();
+}
+
+document.getElementById('insp-close').addEventListener('click', closeInspector);
+
+document.getElementById('insp-open').addEventListener('click', () => {
+  if (selectedNode?.url) window.open(selectedNode.url, '_blank');
+});
+document.getElementById('insp-copy').addEventListener('click', () => {
+  if (selectedNode?.url) navigator.clipboard.writeText(selectedNode.url);
+});
+document.getElementById('insp-expand').addEventListener('click', () => {
+  if (selectedNode) expandAll(selectedNode.id);
+});
+document.getElementById('insp-collapse').addEventListener('click', () => {
+  if (selectedNode) collapseAll(selectedNode.id);
+});
+document.getElementById('insp-export').addEventListener('click', exportGraph);
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Search
+// ═══════════════════════════════════════════════════════════════════════════
+const searchInput = document.getElementById('search-input');
+const searchClear = document.getElementById('search-clear');
+
+searchInput.addEventListener('input', () => {
+  searchQuery = searchInput.value.trim().toLowerCase();
+  searchClear.classList.toggle('visible', searchQuery.length > 0);
+  updateMatchCount();
+  refreshGraph();
+});
+searchClear.addEventListener('click', () => {
+  searchInput.value = '';
+  searchQuery = '';
+  searchClear.classList.remove('visible');
+  updateMatchCount();
+  refreshGraph();
+});
+
+function updateMatchCount() {
+  if (!searchQuery) {
+    document.getElementById('match-count').textContent = '—';
+    return;
+  }
+  const matches = allNodes.filter(n => nodeMatches(n)).length;
+  document.getElementById('match-count').textContent = `${matches} match${matches === 1 ? '' : 'es'}`;
+}
+
+function nodeMatches(n) {
+  if (!searchQuery) return false;
+  return (n.title || '').toLowerCase().includes(searchQuery) ||
+         (n.url   || '').toLowerCase().includes(searchQuery);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Graph helpers
+// ═══════════════════════════════════════════════════════════════════════════
+function childCount(id) {
+  return allEdges.filter(e => (e.source === id || (e.source && e.source.id === id))).length;
+}
+
+function totalDescendantCount(id) {
+  let count = 0;
+  const queue = [id];
+  const visited = new Set();
+  while (queue.length) {
+    const cur = queue.shift();
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+    const children = allEdges
+      .filter(e => (e.source === cur || (e.source && e.source.id === cur)))
+      .map(e => (typeof e.target === 'string' ? e.target : e.target.id));
+    count += children.length;
+    queue.push(...children);
+  }
+  return count;
+}
+
+function getDepthColor(depth) {
+  return DEPTH_COLORS[Math.min(depth, DEPTH_COLORS.length - 1)];
+}
+
+function getRootChildIndex(nodeId) {
+  // Find the root's direct children and return colour index
+  const rootNode = allNodes.find(n => n.depth === 0);
+  if (!rootNode) return 0;
+  const rootChildren = allEdges
+    .filter(e => e.source === rootNode.id || (e.source && e.source.id === rootNode.id))
+    .map(e => typeof e.target === 'string' ? e.target : e.target.id);
+
+  // Walk up ancestry
+  function findAncestorAtDepth1(id) {
+    let cur = allNodes.find(n => n.id === id);
+    while (cur && cur.depth > 1) {
+      cur = allNodes.find(n => n.id === cur.parent);
+    }
+    return cur;
+  }
+  const ancestor = findAncestorAtDepth1(nodeId);
+  if (!ancestor) return 0;
+  return rootChildren.indexOf(ancestor.id);
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return [r,g,b];
+}
+
+function lightenHex(hex, amount) {
+  // amount: 0 = original, 1 = white
+  const [r,g,b] = hexToRgb(hex);
+  const lr = Math.round(r + (255-r)*amount);
+  const lg = Math.round(g + (255-g)*amount);
+  const lb = Math.round(b + (255-b)*amount);
+  return '#' + [lr,lg,lb].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+function getPathColor(node) {
+  if (node.depth === 0) return PATH_COLORS[0];
+  const idx = getRootChildIndex(node.id);
+  const base = PATH_COLORS[Math.abs(idx) % PATH_COLORS.length];
+  const lightenAmount = Math.max(0, (node.depth - 1) * 0.18);
+  return lightenHex(base, Math.min(lightenAmount, 0.72));
+}
+
+function nodeColor(node) {
+  if (colorMode === 'depth') return getDepthColor(node.depth || 0);
+  return getPathColor(node);
+}
+
+function nodeSize(node) {
+  const base = sizeMode === 'direct' ? childCount(node.id) : totalDescendantCount(node.id);
+  return Math.max(4, Math.min(4 + base * 1.5, 24));
+}
+
+function nodeOpacity(node) {
+  if (!searchQuery) return 1;
+  return nodeMatches(node) ? 1 : 0.08;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Expand / Collapse
+// ═══════════════════════════════════════════════════════════════════════════
+function getDirectChildren(nodeId) {
+  return allEdges
+    .filter(e => e.source === nodeId || (e.source && e.source.id === nodeId))
+    .map(e => typeof e.target === 'string' ? e.target : e.target.id);
+}
+
+function expandNode(nodeId) {
+  getDirectChildren(nodeId).forEach(id => visibleIds.add(id));
+}
+
+function collapseNode(nodeId) {
+  // Remove all descendants
+  const queue = getDirectChildren(nodeId);
+  while (queue.length) {
+    const cur = queue.shift();
+    if (visibleIds.has(cur)) {
+      visibleIds.delete(cur);
+      queue.push(...getDirectChildren(cur));
+    }
+  }
+}
+
+function expandAll(nodeId) {
+  const queue = [nodeId];
+  while (queue.length) {
+    const cur = queue.shift();
+    const children = getDirectChildren(cur);
+    children.forEach(id => visibleIds.add(id));
+    queue.push(...children);
+  }
+  refreshGraph();
+}
+
+function collapseAll(nodeId) {
+  collapseNode(nodeId);
+  refreshGraph();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Graph rendering
+// ═══════════════════════════════════════════════════════════════════════════
+function buildGraphData() {
+  const visNodes = allNodes.filter(n => visibleIds.has(n.id));
+  const visSet   = new Set(visNodes.map(n => n.id));
+  const visEdges = allEdges.filter(e => {
+    const s = typeof e.source === 'string' ? e.source : e.source?.id;
+    const t = typeof e.target === 'string' ? e.target : e.target?.id;
+    return visSet.has(s) && visSet.has(t);
+  });
+  return {
+    nodes: visNodes.map(n => ({ ...n })),
+    links: visEdges.map(e => ({
+      source: typeof e.source === 'string' ? e.source : e.source.id,
+      target: typeof e.target === 'string' ? e.target : e.target.id,
+    })),
+  };
+}
+
+function refreshGraph() {
+  if (!gfx) return;
+  gfx.graphData(buildGraphData());
+}
+
+function initGraph() {
+  const wrap = document.getElementById('3d-graph');
+  const isDark = html.getAttribute('data-theme') === 'dark';
+
+  gfx = ForceGraph3D()(wrap)
+    .backgroundColor(isDark ? '#0d0d0d' : '#f0f1f3')
+    .width(wrap.clientWidth)
+    .height(wrap.clientHeight)
+    .graphData(buildGraphData())
+    .nodeId('id')
+    .nodeLabel(n => `<div style="font-family:monospace;font-size:12px;padding:4px 8px;background:#111;border:1px solid #333;border-radius:4px;color:#e8e8e8;">${n.title}<br><span style="color:#00b4ff;font-size:11px;">${n.url}</span></div>`)
+    .nodeColor(n => {
+      const col = nodeColor(n);
+      return nodeOpacity(n) < 1
+        ? col + '14'   // ~8% opacity when dimmed
+        : col;
+    })
+    .nodeVal(nodeSize)
+    .nodeThreeObject(n => {
+      // Sprite label
+      const sprite = new SpriteText(n.title);
+      sprite.color    = html.getAttribute('data-theme') === 'dark' ? '#e8e8e8' : '#1a1a2e';
+      sprite.textHeight = 3;
+      sprite.backgroundColor = 'rgba(0,0,0,0)';
+      return sprite;
+    })
+    .nodeThreeObjectExtend(true)
+    .linkColor(() => html.getAttribute('data-theme') === 'dark' ? '#2a2a2a' : '#c0c4cc')
+    .linkOpacity(0.6)
+    .linkWidth(1)
+    .onNodeClick((node, event) => {
+      if (selectedNode && selectedNode.id === node.id) {
+        closeInspector();
+      } else {
+        openInspector(node);
+      }
+    })
+    .onNodeDblClick((node) => {
+      // Toggle expand/collapse
+      const children = getDirectChildren(node.id);
+      const anyVisible = children.some(id => visibleIds.has(id));
+      if (anyVisible) {
+        collapseNode(node.id);
+      } else {
+        expandNode(node.id);
+      }
+      refreshGraph();
+    })
+    .onNodeDragEnd(node => {
+      node.fx = node.x;
+      node.fy = node.y;
+      node.fz = node.z;
+      pinnedIds.add(node.id);
+    })
+    .onBackgroundClick(() => {
+      closeInspector();
+    });
+
+  // Responsive resize
+  const ro = new ResizeObserver(() => {
+    if (gfx) {
+      gfx.width(wrap.clientWidth).height(wrap.clientHeight);
+    }
+  });
+  ro.observe(wrap);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Color / Size mode toggles
+// ═══════════════════════════════════════════════════════════════════════════
+function setColorMode(mode) {
+  colorMode = mode;
+  document.getElementById('color-depth').classList.toggle('active', mode === 'depth');
+  document.getElementById('color-path').classList.toggle('active',  mode === 'path');
+  refreshGraph();
+}
+
+function setSizeMode(mode) {
+  sizeMode = mode;
+  document.getElementById('size-direct').classList.toggle('active', mode === 'direct');
+  document.getElementById('size-total').classList.toggle('active',  mode === 'total');
+  refreshGraph();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Stats
+// ═══════════════════════════════════════════════════════════════════════════
+function updateStats() {
+  document.getElementById('stat-nodes').textContent = allNodes.length;
+  document.getElementById('stat-edges').textContent = allEdges.length;
+  const maxDepth = allNodes.reduce((m, n) => Math.max(m, n.depth || 0), 0);
+  document.getElementById('stat-depth').textContent = maxDepth;
+  document.getElementById('tb-domain').textContent   = allNodes.find(n => n.depth === 0)?.id || '';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Export
+// ═══════════════════════════════════════════════════════════════════════════
+function exportGraph() {
+  const data = JSON.stringify({ nodes: allNodes, edges: allEdges }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const domain = allNodes.find(n => n.depth === 0)?.id || 'graph';
+  a.download = `sitemaze-${domain}.json`;
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Load graph data
+// ═══════════════════════════════════════════════════════════════════════════
+function loadGraph(graph) {
+  allNodes = graph.nodes || [];
+  allEdges = graph.edges || [];
+
+  // Show only root initially
+  visibleIds.clear();
+  const root = allNodes.find(n => n.depth === 0);
+  if (root) visibleIds.add(root.id);
+
+  document.getElementById('loading').classList.add('hidden');
+  updateStats();
+  initGraph();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Crawl via SSE
+// ═══════════════════════════════════════════════════════════════════════════
+function startCrawlSSE(params) {
+  const logBox = document.getElementById('log-box');
+  const progressBar = document.getElementById('progress-bar');
+  document.getElementById('loading-title').textContent = `◈ Mapping  ${new URL(params.url.startsWith('http') ? params.url : 'https://'+params.url).hostname}`;
+
+  let pageCount = 0;
+
+  function appendLog(msg, cls = '') {
+    const line = document.createElement('div');
+    line.className = 'log-line' + (cls ? ' ' + cls : '');
+    line.textContent = msg;
+    logBox.appendChild(line);
+    logBox.scrollTop = logBox.scrollHeight;
+
+    // Crude progress: count discovered pages
+    const m = msg.match(/\[(\d+)\/(\d+)\]/);
+    if (m) {
+      const pct = Math.round(parseInt(m[1]) / parseInt(m[2]) * 100);
+      progressBar.style.width = pct + '%';
+    }
+  }
+
+  fetch('/api/crawl', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  }).then(res => {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    function pump() {
+      return reader.read().then(({ done, value }) => {
+        if (cancelFetch || done) { reader.cancel(); return; }
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop() || '';
+        for (const part of parts) {
+          const line = part.replace(/^data: /, '').trim();
+          if (!line) continue;
+          try {
+            const msg = JSON.parse(line);
+            if (msg.type === 'log') {
+              appendLog(msg.message, msg.message.includes('✓') ? 'ok' : '');
+            } else if (msg.type === 'done') {
+              progressBar.style.width = '100%';
+              appendLog('> Done!', 'ok');
+              loadGraph(msg.graph);
+            } else if (msg.type === 'error') {
+              appendLog('✗ ' + msg.message, 'err');
+            }
+          } catch {}
+        }
+        return pump();
+      });
+    }
+    return pump();
+  }).catch(e => {
+    document.getElementById('log-box').innerHTML += `<div class="log-line err">✗ ${e.message}</div>`;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Boot
+// ═══════════════════════════════════════════════════════════════════════════
+document.getElementById('cancel-btn').addEventListener('click', () => {
+  cancelFetch = true;
+  window.location.href = '/';
+});
+
+document.getElementById('back-btn').addEventListener('click', () => {
+  window.history.back();
+});
+
+window.addEventListener('load', () => {
+  // Try session storage first (import or fresh)
+  const stored = sessionStorage.getItem('sm-graph');
+  if (stored) {
+    sessionStorage.removeItem('sm-graph');
+    try {
+      loadGraph(JSON.parse(stored));
+      return;
+    } catch {}
+  }
+
+  // Otherwise crawl mode
+  const params = JSON.parse(sessionStorage.getItem('sm-crawl-params') || 'null');
+  sessionStorage.removeItem('sm-crawl-params');
+
+  if (params) {
+    startCrawlSSE(params);
+  } else {
+    // Fallback: check URL param
+    const urlParam = new URLSearchParams(window.location.search).get('url');
+    if (urlParam) {
+      startCrawlSSE({ url: urlParam, auth: {}, max_depth: 5, max_pages: 500 });
+    } else {
+      window.location.href = '/';
+    }
+  }
+});
+</script>
+
+<!-- SpriteText for node labels (bundled with 3d-force-graph via three-spritetext) -->
+<script src="https://unpkg.com/three-spritetext"></script>
+</body>
+</html>

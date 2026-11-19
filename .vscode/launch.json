@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug SiteMaze",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "sitemaze",
+      "args": ["--debug", "--no-browser"],
+      "env": {
+        "FLASK_DEBUG": "1",
+        "FLASK_ENV": "development"
+      },
+      "jinja": true,
+      "justMyCode": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug SiteMaze (open browser)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "sitemaze",
+      "args": ["--debug"],
+      "env": {
+        "FLASK_DEBUG": "1"
+      },
+      "jinja": true,
+      "justMyCode": false,
+      "console": "integratedTerminal"
+    }
+  ]
+}

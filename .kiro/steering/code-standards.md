@@ -102,8 +102,9 @@ CSS custom properties (`--var`) for every colour and size. No hardcoded hex valu
 - Commits are atomic: one logical change per commit
 - Commit messages follow: `type: short description` where type is one of:
   `feat` `fix` `chore` `docs` `refactor` `test` `style`
-- Never commit: cache files, `.env`, `__pycache__`, `.venv`, secrets, or personal data
+- Never commit: cache files, `.env`, `__pycache__`, `.venv`, secrets, personal data, or anything under `.kiro/`
 - The `cache/` directory is gitignored — crawl results never enter the repo
+- The `.kiro/` directory is gitignored — hooks, steering, and all agent internals stay local only and are never pushed to the public repo
 
 ---
 
